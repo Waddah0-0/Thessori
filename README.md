@@ -5,7 +5,7 @@
 </div>
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x400?text=Hero+Image/Landing+Page+Screenshot" alt="Thessori UI Screenshot" />
+  <img src="assets/hero.png" alt="Thessori UI Screenshot" />
 </div>
 
 Every research project starts the same way: you have a question, and between you and an answer sit a few hundred papers you haven't read. Finding the relevant ones, reading them, and noticing what nobody has tried yet is mechanical work — right up until the moment it isn't.
@@ -23,7 +23,7 @@ Built for the **Qwen Cloud Autopilot Agent Hackathon**.
 - **Follows the threads:** The final gap analysis generates follow-up queries. One click on "Deep Dive" and the agent starts a fresh run on the gaps it just found—which is how real research actually works.
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x400?text=Human+Checkpoint+Screenshot" alt="Human Checkpoint" />
+  <img src="assets/checkpoint.png" alt="Human Checkpoint" />
 </div>
 
 ## How it works
@@ -85,7 +85,7 @@ flowchart TD
 ```
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x400?text=Final+Report+and+Chat+Screenshot" alt="Final Report" />
+  <img src="assets/report.png" alt="Final Report" />
 </div>
 
 ## Running it (Easiest Way: Docker)
@@ -138,6 +138,6 @@ This project is Open Source under the MIT License.
 ## Author
 
 **Waddah Ali**
-- [LinkedIn](#) <!-- Replace with your actual LinkedIn URL -->
-- [GitHub](#) <!-- Replace with your actual GitHub URL -->
-- [Kaggle](#) <!-- Replace with your actual Kaggle URL -->
+- [LinkedIn](https://www.linkedin.com/in/waddah-ali-dev/) <!-- Replace with your actual LinkedIn URL -->
+- [GitHub](https://github.com/Waddah0-0) <!-- Replace with your actual GitHub URL -->
+- [Kaggle](https://www.kaggle.com/waddahali) <!-- Replace with your actual Kaggle URL -->
