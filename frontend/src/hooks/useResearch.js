@@ -20,6 +20,8 @@ export function useResearch() {
   const [activeQueries, setActiveQueries] = useState([''])
   const [progressMsg, setProgressMsg] = useState('')
   const [progressStage, setProgressStage] = useState('papers_summarized')
+  const [currentIndex, setCurrentIndex] = useState(-1)
+  const [currentAction, setCurrentAction] = useState('')
   const [resumable, setResumable] = useState(null) // { sessionId, status, papers, markdown } | null
   const [searchInfo, setSearchInfo] = useState(null) // { queries, original } — what was actually searched
 
@@ -103,6 +105,8 @@ export function useResearch() {
     setError(null)
     setProgressMsg('Initializing…')
     setProgressStage('papers_summarized')
+    setCurrentIndex(-1)
+    setCurrentAction('')
 
     const intervalId = setInterval(async () => {
       try {
@@ -111,6 +115,8 @@ export function useResearch() {
           const data = await res.json()
           if (data.detail) setProgressMsg(data.detail)
           if (data.stage) setProgressStage(data.stage)
+          if (typeof data.current_index === 'number') setCurrentIndex(data.current_index)
+          if (data.action) setCurrentAction(data.action)
         }
       } catch (e) {
         // ignore polling errors
@@ -153,5 +159,5 @@ export function useResearch() {
     }
   }
 
-  return { stage, sessionId, papers, markdown, error, startSearch, approvePapers, deepDive, activeQueries, progressMsg, progressStage, resumable, resumeSession, dismissResume, searchInfo }
+  return { stage, sessionId, papers, markdown, error, startSearch, approvePapers, deepDive, activeQueries, progressMsg, progressStage, currentIndex, currentAction, resumable, resumeSession, dismissResume, searchInfo }
 }

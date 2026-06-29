@@ -1,11 +1,11 @@
 <div align="center">
-  <img src="https://img.shields.io/badge/Powered%20by-Qwen-blue?style=for-the-badge&logo=alibabacloud" alt="Powered by Qwen" />
-  <h1>Thessori</h1>
+  <img src="https://img.shields.io/badge/Powered%20by-Qwen-blue?style=for-the-badge&logo=alibabacloud" alt="Powered by Qwen Cloud" />
+  <h1><img src="assets/thessori_logo.png" alt="Thessori Logo" width="40" valign="middle" style="margin-right: 10px;" /> Thessori</h1>
   <p>An autonomous literature-review agent that actually reads the paper and stops to show its work.</p>
 </div>
 
 <div align="center">
-  <img src="assets/hero.png" alt="Thessori UI Screenshot" />
+  <img src="assets/hero.png" alt="Thessori UI" />
 </div>
 
 Every research project starts the same way: you have a question, and between you and an answer sit a few hundred papers you haven't read. Finding the relevant ones, reading them, and noticing what nobody has tried yet is mechanical work — right up until the moment it isn't.
@@ -23,7 +23,7 @@ Built for the **Qwen Cloud Autopilot Agent Hackathon**.
 - **Follows the threads:** The final gap analysis generates follow-up queries. One click on "Deep Dive" and the agent starts a fresh run on the gaps it just found—which is how real research actually works.
 
 <div align="center">
-  <img src="assets/checkpoint.png" alt="Human Checkpoint" />
+  <img src="assets/checkpoint.png" alt="HITL" />
 </div>
 
 ## How it works
@@ -138,6 +138,6 @@ This project is Open Source under the MIT License.
 ## Author
 
 **Waddah Ali**
-- [LinkedIn](https://www.linkedin.com/in/waddah-ali-dev/) <!-- Replace with your actual LinkedIn URL -->
-- [GitHub](https://github.com/Waddah0-0) <!-- Replace with your actual GitHub URL -->
-- [Kaggle](https://www.kaggle.com/waddahali) <!-- Replace with your actual Kaggle URL -->
+- [LinkedIn](https://www.linkedin.com/in/waddah-ali-dev/) 
+- [GitHub](https://github.com/Waddah0-0) 
+- [Kaggle](https://www.kaggle.com/waddahali) 

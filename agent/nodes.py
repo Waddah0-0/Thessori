@@ -142,18 +142,18 @@ async def summarize_papers(state: dict) -> dict:
     
     total = len(state["approved_papers"])
     for i, paper in enumerate(state["approved_papers"]):
-        set_progress(session_id, "papers_summarized", f"Processing paper {i+1} of {total}...")
+        set_progress(session_id, "papers_summarized", f"Processing paper {i+1} of {total}...", current_index=i, action="processing")
 
         full_text = ""
         if paper.get("source") == "arxiv" and paper.get("url"):
             try:
-                set_progress(session_id, "papers_summarized", f"Downloading PDF {i+1} of {total}...")
+                set_progress(session_id, "papers_summarized", f"Downloading PDF {i+1} of {total}...", current_index=i, action="downloading")
                 pdf_url = paper["url"].replace("abs", "pdf") + ".pdf"
                 async with httpx.AsyncClient(timeout=30) as http_client:
                     pdf_resp = await http_client.get(pdf_url, follow_redirects=True)
                     pdf_resp.raise_for_status()
 
-                set_progress(session_id, "papers_summarized", f"Extracting text from PDF {i+1} of {total}...")
+                set_progress(session_id, "papers_summarized", f"Extracting text from PDF {i+1} of {total}...", current_index=i, action="extracting")
                 reader = PdfReader(io.BytesIO(pdf_resp.content))
                 text_chunks = [page.extract_text() or "" for page in reader.pages[:25]]
                 full_text = _smart_pdf_context("\n".join(text_chunks))
@@ -162,7 +162,7 @@ async def summarize_papers(state: dict) -> dict:
                 full_text = ""
 
         content_to_summarize = f"Full Text:\n{full_text}" if full_text else f"Abstract:\n{paper['abstract']}"
-        set_progress(session_id, "papers_summarized", f"Summarizing paper {i+1} of {total}...")
+        set_progress(session_id, "papers_summarized", f"Summarizing paper {i+1} of {total}...", current_index=i, action="summarizing")
 
         prompt = (
             f"Paper title: {paper['title']}\n"

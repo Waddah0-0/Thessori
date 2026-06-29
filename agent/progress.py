@@ -8,8 +8,19 @@
 progress_store: dict[str, dict] = {}
 
 
-def set_progress(session_id: str, stage: str, detail: str) -> None:
-    progress_store[session_id] = {"stage": stage, "detail": detail}
+def set_progress(
+    session_id: str,
+    stage: str,
+    detail: str,
+    current_index: int = -1,
+    action: str = "",
+) -> None:
+    progress_store[session_id] = {
+        "stage": stage,
+        "detail": detail,
+        "current_index": current_index,
+        "action": action,
+    }
 
 
 def clear_progress(session_id: str) -> None:

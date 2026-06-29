@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import PaperCard from './PaperCard'
 import PipelineStatus from './PipelineStatus'
 
-export default function PaperReview({ papers, onApprove, loading, progressMsg, progressStage, searchInfo }) {
+export default function PaperReview({ papers, onApprove, loading, progressMsg, progressStage, currentIndex, currentAction, searchInfo }) {
   const [checked, setChecked] = useState(() => new Set(papers.map((_, i) => i)))
 
   const expanded = searchInfo?.queries || []
@@ -17,6 +17,103 @@ export default function PaperReview({ papers, onApprove, loading, progressMsg, p
       next.has(i) ? next.delete(i) : next.add(i)
       return next
     })
+  }
+
+  const approvedPapers = papers.filter((_, i) => checked.has(i))
+
+  if (loading) {
+    return (
+      <motion.div
+        className="relative z-10 min-h-screen px-4 py-16 max-w-2xl mx-auto"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <PipelineStatus
+          currentStatus={progressStage || 'papers_summarized'}
+          progressMsg={progressMsg}
+        />
+
+        <motion.div
+          className="glass p-8 rounded-2xl mt-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'Space Grotesk' }}>
+            Analyzing selected papers
+          </h2>
+          <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
+            Thessori is downloading the full PDFs, extracting the text, and summarizing the methodology, findings, and limitations.
+          </p>
+
+          <div className="space-y-3">
+            {approvedPapers.map((paper, idx) => {
+              const isDone = idx < currentIndex
+              const isActive = idx === currentIndex
+              const isQueued = idx > currentIndex
+
+              let statusText = 'Queued'
+              let statusColor = 'var(--muted)'
+              if (isDone) {
+                statusText = 'Summarized'
+                statusColor = 'var(--indigo)'
+              } else if (isActive) {
+                if (currentAction === 'downloading') statusText = 'Downloading PDF...'
+                else if (currentAction === 'extracting') statusText = 'Extracting text...'
+                else if (currentAction === 'summarizing') statusText = 'Summarizing...'
+                else statusText = 'Processing...'
+                statusColor = 'var(--indigo)'
+              }
+
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-4 rounded-xl transition-colors"
+                  style={{
+                    background: isActive ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${isActive ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)'}`
+                  }}
+                >
+                  <div className="flex-1 min-w-0 pr-4">
+                    <h4 className="font-semibold text-sm truncate" style={{ color: isQueued ? 'var(--muted)' : 'var(--ink)' }}>
+                      {paper.title}
+                    </h4>
+                    <p className="text-xs truncate mt-0.5" style={{ color: 'var(--muted)' }}>
+                      {paper.authors?.slice(0, 2).join(', ')}{paper.authors?.length > 2 ? ' et al.' : ''} • {paper.year}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {isActive && (
+                      <motion.span
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: 'var(--indigo)' }}
+                        animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      />
+                    )}
+                    <span
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style={{
+                        background: isDone
+                          ? 'rgba(99,102,241,0.1)'
+                          : isActive
+                          ? 'rgba(99,102,241,0.05)'
+                          : 'rgba(255,255,255,0.05)',
+                        color: statusColor,
+                        border: `1px solid ${isDone ? 'rgba(99,102,241,0.2)' : 'transparent'}`
+                      }}
+                    >
+                      {statusText}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </motion.div>
+      </motion.div>
+    )
   }
 
   return (

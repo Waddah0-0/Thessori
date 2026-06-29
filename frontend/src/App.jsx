@@ -7,7 +7,7 @@ import DoneScreen from './components/DoneScreen'
 import { useResearch } from './hooks/useResearch'
 
 export default function App() {
-  const { stage, sessionId, papers, markdown, error, startSearch, approvePapers, deepDive, activeQueries, progressMsg, progressStage, resumable, resumeSession, dismissResume, searchInfo } = useResearch()
+  const { stage, sessionId, papers, markdown, error, startSearch, approvePapers, deepDive, activeQueries, progressMsg, progressStage, currentIndex, currentAction, resumable, resumeSession, dismissResume, searchInfo } = useResearch()
   const [energy, setEnergy] = useState(0)
 
   return (
@@ -48,6 +48,8 @@ export default function App() {
             loading={stage === 'generating'}
             progressMsg={progressMsg}
             progressStage={progressStage}
+            currentIndex={currentIndex}
+            currentAction={currentAction}
             searchInfo={searchInfo}
           />
         )}

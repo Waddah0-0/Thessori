@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import remarkGfm from 'remark-gfm'
 
 // The agent appends a ```json { agent_action: "search", ... } ``` block to trigger a search.
 const JSON_BLOCK = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
@@ -11,8 +14,14 @@ function visibleDuringStream(text) {
   return i >= 0 ? text.slice(0, i).trimEnd() : text
 }
 
-export default function AssistantWidget({ sessionId, onStartSearch }) {
-  const [isOpen, setIsOpen] = useState(false)
+const SUGGESTIONS = [
+  "Summarize key limitations",
+  "Compare methodologies",
+  "What are the future directions?",
+  "List dataset requirements"
+]
+
+export default function AssistantWidget({ sessionId, onStartSearch, isOpen, setIsOpen }) {
   const [chatHistory, setChatHistory] = useState([
     { role: 'assistant', content: "Hi! I'm Thessori. Ask me anything about this report, or tell me to run new queries for you!" }
   ])
@@ -31,22 +40,18 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
     }
   }, [chatHistory, isOpen])
 
-  async function handleChat(e) {
-    e.preventDefault()
-    if (!chatInput.trim() || isChatting) return
+  async function handleSend(text) {
+    if (!text.trim() || isChatting) return
 
-    const userMsg = chatInput.trim()
-    // Snapshot prior turns for conversation memory (excludes this new message).
-    const priorHistory = chatHistory.slice(-8)
-    setChatInput('')
-    setChatHistory((prev) => [...prev, { role: 'user', content: userMsg }])
+    setChatHistory((prev) => [...prev, { role: 'user', content: text }])
     setIsChatting(true)
 
     try {
+      const priorHistory = chatHistory.slice(-8)
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, message: userMsg, history: priorHistory }),
+        body: JSON.stringify({ session_id: sessionId, message: text, history: priorHistory }),
       })
 
       if (!res.ok || !res.body) {
@@ -60,7 +65,6 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
         throw new Error(msg)
       }
 
-      // Stream tokens into a single assistant bubble (added on the first visible token).
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let full = ''
@@ -83,7 +87,6 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
         }
       }
 
-      // Stream finished — parse any agent action block out of the full text.
       let replyContent = full
       const match = full.match(JSON_BLOCK)
       if (match) {
@@ -93,7 +96,7 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
           if (parsed.agent_action === 'search' && parsed.queries && parsed.queries.length > 0) {
             setPendingQueries(parsed.queries)
             replyContent +=
-              "\n\n**Heads up:** Proceeding starts a new research loop — download your current report first so you don't lose it."
+              "\n\nI have prepared the recommended follow-up search queries. You can review and execute them below."
           }
         } catch (err) {
           console.error('Failed to parse agent JSON action', err)
@@ -103,7 +106,6 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
         replyContent = "Okay, I'm setting up a new search for you now!"
       }
 
-      // Finalize the bubble (or add it if nothing was visibly streamed, e.g. JSON-only).
       setChatHistory((prev) => {
         const next = [...prev]
         if (started) {
@@ -118,6 +120,14 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
     } finally {
       setIsChatting(false)
     }
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    if (!chatInput.trim() || isChatting) return
+    const text = chatInput.trim()
+    setChatInput('')
+    handleSend(text)
   }
 
   return (
@@ -137,7 +147,7 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
               boxShadow: '0 4px 14px 0 rgba(99,102,241,0.3)'
             }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
           </motion.button>
@@ -147,70 +157,139 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="fixed bottom-8 right-8 z-50 glass flex flex-col shadow-2xl rounded-2xl overflow-hidden"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: "tween", duration: 0.28, ease: "easeOut" }}
+            className="fixed top-0 right-0 bottom-0 z-50 glass flex flex-col shadow-2xl border-l overflow-hidden"
             style={{
-              width: '400px',
-              height: '600px',
-              minWidth: '300px',
-              minHeight: '400px',
-              maxWidth: '90vw',
-              maxHeight: '85vh',
-              resize: 'both',
-              border: '1px solid rgba(99,102,241,0.25)'
+              width: '420px',
+              maxWidth: '100vw',
+              borderColor: 'rgba(99,102,241,0.2)'
             }}
           >
             {/* Header */}
             <div
-              className="p-4 flex items-center justify-between border-b"
-              style={{ borderColor: 'rgba(99,102,241,0.12)', background: 'rgba(99,102,241,0.06)' }}
+              className="p-5 flex items-center justify-between border-b"
+              style={{ borderColor: 'rgba(99,102,241,0.12)', background: 'rgba(99,102,241,0.04)' }}
             >
-              <h3 className="font-bold text-lg flex items-center gap-2" style={{ fontFamily: 'Space Grotesk', color: 'var(--ink)' }}>
-                <span className="w-3 h-3 rounded-full animate-pulse" style={{ background: 'var(--indigo)' }}></span>
+              <h3 className="font-bold text-base flex items-center gap-2" style={{ fontFamily: 'Space Grotesk', color: 'var(--ink)' }}>
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--indigo)' }}></span>
                 Ask Thessori
               </h3>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-slate-400 hover:text-slate-100 transition-colors p-1"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 assistant-chat-scroll">
+              <style>{`
+                .assistant-chat-scroll::-webkit-scrollbar {
+                  width: 5px;
+                }
+                .assistant-chat-scroll::-webkit-scrollbar-track {
+                  background: transparent;
+                }
+                .assistant-chat-scroll::-webkit-scrollbar-thumb {
+                  background: rgba(99, 102, 241, 0.2);
+                  border-radius: 99px;
+                }
+                .assistant-chat-scroll::-webkit-scrollbar-thumb:hover {
+                  background: rgba(99, 102, 241, 0.35);
+                }
+              `}</style>
               {chatHistory.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`px-4 py-3 rounded-2xl max-w-[85%] text-sm ${
+                    className={`px-4 py-3 rounded-2xl max-w-[88%] text-xs ${
                       msg.role === 'user'
                         ? 'text-white rounded-br-none'
                         : 'rounded-bl-none border'
                     }`}
                     style={{
                       background: msg.role === 'user' ? 'linear-gradient(135deg, var(--indigo) 0%, var(--glow) 100%)' : 'rgba(99,102,241,0.06)',
-                      borderColor: 'rgba(99,102,241,0.15)',
+                      borderColor: 'rgba(99,102,241,0.12)',
                       color: msg.role === 'user' ? '#fff' : 'var(--ink)',
-                      boxShadow: msg.role === 'user' ? '0 2px 10px rgba(99,102,241,0.25)' : 'none',
+                      boxShadow: msg.role === 'user' ? '0 2px 10px rgba(99,102,241,0.2)' : 'none',
                       lineHeight: 1.6
                     }}
                   >
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath, remarkGfm]}
+                      rehypePlugins={[rehypeKatex]}
+                      components={{
+                        table: ({ children }) => (
+                          <div className="overflow-x-auto my-2 border border-[rgba(99,102,241,0.15)] rounded-lg w-full">
+                            <table className="w-full text-[11px] text-left border-collapse">
+                              {children}
+                            </table>
+                          </div>
+                        ),
+                        th: ({ children }) => (
+                          <th className="p-2 font-bold uppercase tracking-wider bg-[rgba(99,102,241,0.08)] border-b border-[rgba(99,102,241,0.15)] text-[10px]" style={{ color: 'var(--indigo)' }}>
+                            {children}
+                          </th>
+                        ),
+                        td: ({ children }) => (
+                          <td className="p-2 border-b border-[rgba(99,102,241,0.1)] text-[11px]" style={{ color: 'var(--ink)' }}>
+                            {children}
+                          </td>
+                        ),
+                        tr: ({ children }) => (
+                          <tr className="hover:bg-[rgba(99,102,241,0.02)] transition-colors">
+                            {children}
+                          </tr>
+                        ),
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
                   </div>
                 </div>
               ))}
+
+              {/* Action Suggestion Pills (Show only at the beginning) */}
+              {chatHistory.length === 1 && !isChatting && (
+                <div className="pt-2 flex flex-col gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1">
+                    Suggested Actions
+                  </span>
+                  <div className="flex flex-col gap-1.5">
+                    {SUGGESTIONS.map((text, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSend(text)}
+                        className="text-left px-3 py-2 rounded-lg text-xs font-medium border transition-colors hover:bg-[rgba(99,102,241,0.06)] hover:text-[var(--indigo)]"
+                        style={{
+                          borderColor: 'rgba(99,102,241,0.15)',
+                          background: 'rgba(255,255,255,0.01)',
+                          color: 'var(--ink)'
+                        }}
+                      >
+                        {text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {isChatting && chatHistory[chatHistory.length - 1]?.role !== 'assistant' && (
                 <div className="flex justify-start">
                   <div
-                    className="px-4 py-3 rounded-2xl border rounded-bl-none text-sm"
-                    style={{ background: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.15)', color: 'var(--muted)' }}
+                    className="px-4 py-2.5 rounded-2xl border rounded-bl-none w-16 flex items-center justify-center"
+                    style={{ background: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.12)' }}
                   >
-                    <span className="animate-pulse">Thessori is thinking...</span>
+                    <div className="flex gap-1 items-center justify-center">
+                      <motion.span className="w-1.5 h-1.5 rounded-full bg-[var(--indigo)]" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0 }} />
+                      <motion.span className="w-1.5 h-1.5 rounded-full bg-[var(--indigo)]" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }} />
+                      <motion.span className="w-1.5 h-1.5 rounded-full bg-[var(--indigo)]" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -219,28 +298,36 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
 
             {/* Pending Action Area */}
             {pendingQueries && (
-              <div className="p-4 border-t" style={{ borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.08)' }}>
-                <p className="text-sm mb-3" style={{ color: 'var(--ink)' }}>
-                  <strong>Proposed Queries:</strong>
+              <div className="p-5 border-t" style={{ borderColor: 'rgba(99, 102, 241, 0.2)', background: 'rgba(99, 102, 241, 0.03)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--indigo)' }}>
+                  Proposed Search Queries
                 </p>
-                <ul className="list-disc pl-5 mb-4 text-sm" style={{ color: 'var(--ink)' }}>
-                  {pendingQueries.map((q, idx) => <li key={idx}>{q}</li>)}
-                </ul>
+                <div className="flex flex-col gap-1.5 mb-4">
+                  {pendingQueries.map((q, idx) => (
+                    <div
+                      key={idx}
+                      className="text-xs px-3 py-2 rounded-lg border bg-[rgba(255,255,255,0.01)]"
+                      style={{ borderColor: 'rgba(99, 102, 241, 0.12)', color: 'var(--ink)' }}
+                    >
+                      {q}
+                    </div>
+                  ))}
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
                       onStartSearch(pendingQueries)
                       setPendingQueries(null)
                     }}
-                    className="flex-1 py-2 rounded-xl text-white font-bold text-sm transition-all"
+                    className="flex-1 py-2 rounded-xl text-white font-bold text-xs transition-all"
                     style={{ background: 'var(--indigo)' }}
                   >
-                    Proceed
+                    Proceed with Search
                   </button>
                   <button
                     onClick={() => setPendingQueries(null)}
-                    className="flex-1 py-2 rounded-xl font-bold text-sm transition-all"
-                    style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--ink)' }}
+                    className="flex-1 py-2 rounded-xl font-bold text-xs transition-all border"
+                    style={{ background: 'transparent', borderColor: 'rgba(99, 102, 241, 0.2)', color: 'var(--ink)' }}
                   >
                     Cancel
                   </button>
@@ -249,18 +336,18 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
             )}
 
             {/* Input Area */}
-            <form onSubmit={handleChat} className="p-4 border-t" style={{ borderColor: 'rgba(99,102,241,0.12)', background: 'rgba(99,102,241,0.04)' }}>
+            <form onSubmit={handleSubmit} className="p-4 border-t" style={{ borderColor: 'rgba(99,102,241,0.12)', background: 'rgba(99,102,241,0.02)' }}>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder="Ask a question or request a search..."
-                  className="flex-1 px-4 py-2.5 rounded-xl border text-sm focus:outline-none transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl border text-xs focus:outline-none transition-colors"
                   style={{
                     color: 'var(--ink)',
                     borderColor: 'rgba(129,140,248,0.3)',
-                    background: 'rgba(255,255,255,0.08)'
+                    background: 'rgba(255,255,255,0.06)'
                   }}
                   onFocus={(e) => e.target.style.borderColor = 'var(--indigo)'}
                   onBlur={(e) => e.target.style.borderColor = 'rgba(99,102,241,0.3)'}
@@ -269,25 +356,19 @@ export default function AssistantWidget({ sessionId, onStartSearch }) {
                 <button
                   type="submit"
                   disabled={!chatInput.trim() || isChatting}
-                  className="px-5 py-2.5 rounded-xl text-white font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="px-4 py-2.5 rounded-xl text-white font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
                   style={{
                     background: 'linear-gradient(135deg, var(--indigo) 0%, var(--glow) 100%)',
-                    boxShadow: '0 4px 14px 0 rgba(99,102,241,0.3)'
+                    boxShadow: '0 4px 14px 0 rgba(99,102,241,0.2)'
                   }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
                   </svg>
                 </button>
               </div>
             </form>
-
-            {/* Custom Resize Handle Indicator */}
-            <div className="absolute bottom-0 right-0 w-6 h-6 pointer-events-none flex items-end justify-end p-1 opacity-50">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--muted)" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 21h6v-6M21 21l-7-7" />
-              </svg>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>

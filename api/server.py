@@ -164,6 +164,8 @@ async def get_progress(session_id: str):
     data = progress_store.get(session_id) or {
         "stage": "papers_summarized",
         "detail": "Processing...",
+        "current_index": -1,
+        "action": "",
     }
     return JSONResponse(data)
 

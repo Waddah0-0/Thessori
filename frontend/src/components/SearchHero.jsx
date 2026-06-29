@@ -32,6 +32,22 @@ function RotatingText({ messages, interval = 1700 }) {
   )
 }
 
+const buttonVariants = {
+  initial: {
+    scale: 1,
+    boxShadow: '0 0 0px rgba(99, 102, 241, 0)',
+  },
+  hover: {
+    scale: 1.02,
+    boxShadow: '0 0 20px rgba(99, 102, 241, 0.45)',
+  }
+}
+
+const arrowVariants = {
+  initial: { x: 0 },
+  hover: { x: 4 }
+}
+
 export default function SearchHero({ initialQueries = [''], onSearch, onType, loading, resumable, onResume, onDismissResume }) {
   const [queries, setQueries] = useState(initialQueries)
   const [maxPapers, setMaxPapers] = useState(20)
@@ -293,35 +309,77 @@ export default function SearchHero({ initialQueries = [''], onSearch, onType, lo
             onClick={handleSearch}
             disabled={!queries.some((q) => q.trim()) || loading}
             className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity disabled:opacity-40 flex items-center justify-center"
-            style={{ background: 'var(--indigo)', minWidth: 150 }}
-            whileHover={loading ? {} : { scale: 1.03 }}
-            whileTap={loading ? {} : { scale: 0.97 }}
+            style={{
+              background: 'var(--indigo)',
+              minWidth: 150,
+            }}
+            variants={buttonVariants}
+            initial="initial"
+            whileHover={loading ? {} : "hover"}
+            whileTap={loading ? {} : { scale: 0.98 }}
           >
-            {loading ? <RotatingText messages={searchingMessages} /> : 'Run Agent →'}
+            {loading ? (
+              <RotatingText messages={searchingMessages} />
+            ) : (
+              <span className="flex items-center gap-1">
+                Run Agent
+                <motion.span
+                  variants={arrowVariants}
+                  transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+                >
+                  →
+                </motion.span>
+              </span>
+            )}
           </motion.button>
         </div>
       </motion.div>
 
-      {/* Step badges */}
+      {/* Connected Workflow Stepper */}
       <motion.div
-        className="flex gap-4 mt-10 flex-wrap justify-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.7 }}
+        className="w-full max-w-xl mt-12 px-4"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
       >
-        {['Discover', 'Rank', 'You Review', 'Summarize', 'Gap Analysis', 'Export'].map((s, i) => (
-          <span
-            key={s}
-            className="px-3 py-1 rounded-full text-xs font-medium"
+        <div className="flex items-center justify-between relative">
+          {/* Faint Connecting Line */}
+          <div
+            className="absolute top-4 left-0 right-0 h-[1px] -z-10"
             style={{
-              background: 'rgba(99,102,241,0.08)',
-              color: 'var(--indigo)',
-              border: '1px solid rgba(99,102,241,0.2)',
+              background: 'linear-gradient(90deg, rgba(99,102,241,0.04), rgba(99,102,241,0.24) 50%, rgba(99,102,241,0.04))'
             }}
-          >
-            {i + 1}. {s}
-          </span>
-        ))}
+          />
+
+          {['Discover', 'Rank', 'Review', 'Summarize', 'Gaps', 'Export'].map((s, i) => (
+            <motion.div
+              key={s}
+              className="flex flex-col items-center gap-2 group cursor-default"
+              whileHover={{ y: -2 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+            >
+              {/* Step Circle Badge */}
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border transition-all"
+                style={{
+                  borderColor: 'rgba(99,102,241,0.2)',
+                  background: 'rgba(20,20,35,0.85)',
+                  color: 'var(--indigo)',
+                }}
+              >
+                {i + 1}
+              </div>
+
+              {/* Step Label */}
+              <span
+                className="text-[10px] font-semibold tracking-wide"
+                style={{ color: 'var(--muted)' }}
+              >
+                {s}
+              </span>
+            </motion.div>
+          ))}
+        </div>
       </motion.div>
     </motion.div>
   )
