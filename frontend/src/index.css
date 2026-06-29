@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter:wght@400;500&display=swap');
+@import 'katex/dist/katex.min.css'; /* math equation rendering */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --indigo: #818cf8; /* accent — brightened for contrast on dark */
+  --glow: #c7d2fe;
+  --ink: #ecebfa; /* primary text — light on dark */
+  --white: #07060f; /* page base (kept name; now the dark base) */
+  --muted: #9aa0c4; /* secondary text — light muted */
+  --glass: rgba(20, 18, 42, 0.5); /* dark translucent card */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--white);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3 {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* Glass card utility */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(129, 140, 248, 0.18);
+  border-radius: 20px;
+}
+
+/* Readable placeholders on dark inputs */
+::placeholder {
+  color: rgba(154, 160, 196, 0.7);
+}
+
+/* Glow ring on focus */
+.glow-ring:focus-within {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+/* Indigo gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--indigo) 0%, var(--glow) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

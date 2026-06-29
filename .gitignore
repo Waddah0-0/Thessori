@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Env / secrets
+.env
+
+# Node / frontend build
+node_modules/
+ui_dist/
+
+# Generated output
+output/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Design and Agent Files
+ARCHITECTURE.md
+TECHNICAL_WRITEUP.md
+thessori_blueprint.md
+.agent
