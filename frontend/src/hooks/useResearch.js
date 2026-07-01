@@ -147,7 +147,7 @@ export function useResearch() {
     loadHistory()
   }
 
-  async function startSearch(queries, maxPapers = 20, topKPapers = 10, useAiExpansion = true) {
+  async function startSearch(queries, maxPapers = 20, topKPapers = 10, useAiExpansion = true, model = 'qwen-plus') {
     setActiveQueries(queries)
     setStage('searching')
     setError(null)
@@ -155,7 +155,7 @@ export function useResearch() {
       const res = await fetch(`${API_BASE}/api/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queries, max_papers: maxPapers, top_k_papers: topKPapers, use_ai_expansion: useAiExpansion }),
+        body: JSON.stringify({ queries, max_papers: maxPapers, top_k_papers: topKPapers, use_ai_expansion: useAiExpansion, model }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)

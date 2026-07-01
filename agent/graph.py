@@ -28,6 +28,7 @@ class ResearchState(TypedDict):
     status: str
     error: str | None
     timestamp: str | None
+    model: str | None
 
 
 def build_graph() -> StateGraph:

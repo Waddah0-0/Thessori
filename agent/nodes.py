@@ -20,6 +20,13 @@ def _qwen_client() -> AsyncOpenAI:
     )
 
 
+def resolve_model(selected_category: str | None) -> str:
+    if selected_category == "qwen-max":
+        return os.environ.get("QWEN_MODEL_MAX", os.environ.get("QWEN_MODEL"))
+    else:
+        return os.environ.get("QWEN_MODEL_PLUS", os.environ.get("QWEN_MODEL"))
+
+
 def _smart_pdf_context(full_text: str, budget: int = 28000) -> str:
     """Turn raw PDF text into a compact, summary-ready context window."""
     text = re.sub(r"[ \t]+", " ", full_text)
@@ -37,7 +44,7 @@ async def expand_queries(state: dict) -> dict:
         return {"status": "queries_expanded_skipped"}
 
     client = _qwen_client()
-    model = os.environ["QWEN_MODEL"]
+    model = resolve_model(state.get("model"))
     
     prompt = (
         "Act as an expert academic researcher. The user wants to research the following topics: "
@@ -96,7 +103,7 @@ async def rank_papers(state: dict) -> dict:
     """Node 2: Use Qwen to rank papers by relevance and return the top K."""
     top_k = state.get("top_k_papers", int(os.environ.get("TOP_K_PAPERS", 10)))
     client = _qwen_client()
-    model = os.environ["QWEN_MODEL"]
+    model = resolve_model(state.get("model"))
 
     titles_block = "\n".join(
         f"{i}. {p['title']} ({p['year']})" for i, p in enumerate(state["raw_papers"])
@@ -136,7 +143,7 @@ async def rank_papers(state: dict) -> dict:
 async def summarize_papers(state: dict) -> dict:
     """Node 3: Summarize each approved paper individually."""
     client = _qwen_client()
-    model = os.environ["QWEN_MODEL"]
+    model = resolve_model(state.get("model"))
     summaries = []
     session_id = state.get("session_id", "default")
     
@@ -194,7 +201,7 @@ async def analyze_gaps(state: dict) -> dict:
     set_progress(session_id, "gaps_analyzed", "Analyzing research gaps across all papers...")
 
     client = _qwen_client()
-    model = os.environ["QWEN_MODEL"]
+    model = resolve_model(state.get("model"))
 
     summaries_block = "\n\n".join(
         f"Paper: {s['title']}\nSummary: {s['summary']}" for s in state["summaries"]

@@ -67,6 +67,7 @@ class QueryRequest(BaseModel):
     use_ai_expansion: bool = True
     max_papers: int | None = None
     top_k_papers: int | None = None
+    model: str | None = None
 
 
 class ApprovalRequest(BaseModel):
@@ -87,7 +88,9 @@ class DeepDiveRequest(BaseModel):
 @app.post("/api/start")
 async def start_research(req: QueryRequest):
     """Start the pipeline. Returns a session_id and the ranked papers for review."""
+    from agent.nodes import resolve_model
     session_id = str(uuid.uuid4())
+    model_name = resolve_model(req.model)
     initial_state = {
         "session_id": session_id,
         "queries": req.queries,
@@ -97,7 +100,8 @@ async def start_research(req: QueryRequest):
         "top_k_papers": req.top_k_papers if req.top_k_papers is not None else int(os.environ.get("TOP_K_PAPERS", 10)),
         "status": "starting",
         "error": None,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "model": model_name
     }
 
     graph = build_graph()
@@ -237,10 +241,10 @@ async def chat_with_report(req: ChatRequest):
     if not state or not state.get("markdown_report"):
         return JSONResponse({"error": "Report not found"}, status_code=404)
 
-    from agent.nodes import _qwen_client
-
+    from agent.nodes import _qwen_client, resolve_model
+ 
     client = _qwen_client()
-    model = os.environ["QWEN_MODEL"]
+    model = resolve_model(state.get("model"))
 
     system_prompt = (
         "You are Thessori, an AI research agent. Answer the user's questions based on the "

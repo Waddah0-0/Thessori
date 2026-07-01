@@ -96,13 +96,22 @@ We chose an explicit state machine over a free-roaming agent loop. The state its
 
 ```python
 class ResearchState(TypedDict):
+    session_id: str
     queries: list[str]
-    candidates: list[dict]
-    approved_ids: list[str]
-    summaries: dict[str, dict]
+    original_queries: list[str]
+    use_ai_expansion: bool
+    max_papers: int
+    top_k_papers: int
+    raw_papers: list[dict]
+    approved_papers: list[dict]
+    summaries: list[dict]
     gap_analysis: str
-    follow_up_queries: list[str]
-    report_markdown: str
+    deep_dive_queries: list[str]
+    markdown_report: str
+    status: str
+    error: str | None
+    timestamp: str | None
+    model: str | None
 ```
 
 Using an explicit `TypedDict` schema ensures that LangGraph treats each key as a persistent channel. In an untyped `dict` schema, partial updates returned by a node cause the remaining keys to fall away; with `ResearchState`, updates merge cleanly across steps.
@@ -181,6 +190,10 @@ All you need is Docker and a Qwen API key.
 QWEN_MODEL=qwen-plus
 QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 QWEN_API_KEY=your_qwen_api_key_here
+
+# Optional: Map UI model categories to custom variants (falls back to QWEN_MODEL)
+# QWEN_MODEL_PLUS=qwen-plus-2025-07-28
+# QWEN_MODEL_MAX=qwen-max-latest
 ```
 
 2. Start the services:

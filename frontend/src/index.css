@@ -86,3 +86,23 @@ h3 {
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: rgba(129, 140, 248, 0.4);
 }
+
+@keyframes gemini-glow {
+  0% {
+    box-shadow: 0 0 15px rgba(129, 140, 248, 0.1), 0 0 3px rgba(129, 140, 248, 0.05);
+    border-color: rgba(129, 140, 248, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(167, 139, 250, 0.25), 0 0 6px rgba(244, 63, 94, 0.15);
+    border-color: rgba(167, 139, 250, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(129, 140, 248, 0.1), 0 0 3px rgba(129, 140, 248, 0.05);
+    border-color: rgba(129, 140, 248, 0.3);
+  }
+}
+
+.gemini-input-focus:focus-within {
+  animation: gemini-glow 3s infinite ease-in-out;
+  background: rgba(10, 8, 25, 0.65) !important;
+}

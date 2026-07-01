@@ -75,6 +75,15 @@ export default function SearchHero({ initialQueries = [''], onSearch, onType, lo
   const [topK, setTopK] = useState(10)
   const [useAiExpansion, setUseAiExpansion] = useState(true)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [inputValue, setInputValue] = useState('')
+  const [showSettings, setShowSettings] = useState(false)
+  const [selectedModel, setSelectedModel] = useState('qwen-plus')
+
+  useEffect(() => {
+    if (initialQueries) {
+      setQueries(initialQueries)
+    }
+  }, [initialQueries])
 
   const searchingMessages = useMemo(
     () =>
@@ -84,15 +93,19 @@ export default function SearchHero({ initialQueries = [''], onSearch, onType, lo
     [useAiExpansion]
   )
 
-  function updateQuery(index, value) {
-    const next = [...queries]
-    next[index] = value
-    setQueries(next)
-    onType?.(next.join(' ').trim().split(/\s+/).filter(Boolean).length)
-  }
-
-  function addQuery() {
-    if (queries.length < 5) setQueries([...queries, ''])
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      const trimmed = inputValue.trim()
+      if (trimmed) {
+        if (queries.length === 1 && queries[0] === '') {
+          setQueries([trimmed])
+        } else {
+          setQueries([...queries, trimmed])
+        }
+        setInputValue('')
+      }
+    }
   }
 
   function removeQuery(index) {
@@ -101,8 +114,20 @@ export default function SearchHero({ initialQueries = [''], onSearch, onType, lo
   }
 
   function handleSearch() {
-    const valid = queries.map((q) => q.trim()).filter(Boolean)
-    if (valid.length) onSearch(valid, maxPapers, topK, useAiExpansion)
+    let allQueries = [...queries]
+    const trimmedInput = inputValue.trim()
+    if (trimmedInput) {
+      if (allQueries.length === 1 && allQueries[0] === '') {
+        allQueries = [trimmedInput]
+      } else {
+        allQueries.push(trimmedInput)
+      }
+    }
+    const valid = allQueries.map((q) => q.trim()).filter(Boolean)
+    if (valid.length) {
+      onSearch(valid, maxPapers, topK, useAiExpansion, selectedModel)
+      setInputValue('')
+    }
   }
 
   return (
@@ -327,171 +352,227 @@ export default function SearchHero({ initialQueries = [''], onSearch, onType, lo
         results, and delivers a unified literature review.
       </motion.p>
 
-      {/* Glass card */}
+      {/* Gemini-Style Input Container */}
       <motion.div
-        className="glass glow-ring w-full max-w-2xl p-6 shadow-xl"
-        initial={{ opacity: 0, scale: 0.96 }}
+        className="glass gemini-input-focus w-full max-w-2xl p-4 shadow-xl flex flex-col relative rounded-[24px] border transition-all"
+        style={{
+          background: 'rgba(20, 18, 42, 0.45)',
+          borderColor: 'rgba(129, 140, 248, 0.2)',
+        }}
+        initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.5 }}
       >
-        <p
-          className="text-xs font-medium mb-3 uppercase tracking-wider"
-          style={{ color: 'var(--muted)' }}
-        >
-          Research queries
-        </p>
-
-        <AnimatePresence>
-          {queries.map((q, i) => (
-            <motion.div
-              key={i}
-              className="flex items-start gap-2 mb-2"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* Query number badge */}
-              <span
-                className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold mt-2"
-                style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--indigo)' }}
-              >
-                {i + 1}
-              </span>
-
-              <textarea
-                className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed rounded-lg px-3 py-2"
-                style={{
-                  color: 'var(--ink)',
-                  border: '1px solid rgba(99,102,241,0.15)',
-                  minHeight: '56px',
-                  fontFamily: 'Inter',
-                }}
-                placeholder={
-                  i === 0
-                    ? 'e.g. transformer attention mechanisms for time series'
-                    : 'e.g. efficiency optimization in large language models'
-                }
-                value={q}
-                rows={2}
-                onChange={(e) => updateQuery(i, e.target.value)}
-              />
-
-              {/* Remove button — only show if more than one query */}
-              {queries.length > 1 && (
-                <motion.button
-                  onClick={() => removeQuery(i)}
-                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs mt-2"
-                  style={{ color: 'var(--muted)', background: 'rgba(100,116,139,0.08)' }}
-                  whileHover={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}
-                  title="Remove this query"
+        {/* Tags Area */}
+        {queries.some(q => q.trim()) && (
+          <div className="flex flex-wrap gap-1.5 mb-2.5 max-h-[100px] overflow-y-auto pr-1">
+            {queries.map((q, idx) => {
+              if (!q.trim()) return null;
+              return (
+                <motion.span
+                  key={idx}
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium border"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(167, 139, 250, 0.1) 100%)',
+                    borderColor: 'rgba(129, 140, 248, 0.25)',
+                    color: 'var(--ink)'
+                  }}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
                 >
-                  ✕
-                </motion.button>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+                  <span>{q}</span>
+                  <button
+                    onClick={() => removeQuery(idx)}
+                    className="text-[9px] hover:text-red-400 font-bold focus:outline-none ml-0.5"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}
+                  >
+                    ✕
+                  </button>
+                </motion.span>
+              )
+            })}
+          </div>
+        )}
 
-        {/* Settings Sliders */}
-        <div className="mt-6 pt-4" style={{ borderTop: '1px solid rgba(99,102,241,0.1)' }}>
-          <div className="flex items-center justify-between mb-4">
-            <label className="text-xs font-medium flex items-center gap-2 cursor-pointer" style={{ color: 'var(--muted)' }}>
-              <input 
-                type="checkbox" 
-                checked={useAiExpansion} 
-                onChange={(e) => setUseAiExpansion(e.target.checked)}
-                className="w-3.5 h-3.5 rounded-sm"
-                style={{ accentColor: 'var(--indigo)' }}
-              />
-              AI Query Expansion (Enhance search terms)
-              <span 
-                className="flex items-center justify-center rounded-full w-3.5 h-3.5 text-[9px] font-bold cursor-help" 
-                style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--indigo)' }}
-                title="Automatically rewrites broad queries into highly specific academic search terms using the LLM to find much better, highly relevant papers."
-              >
-                ?
-              </span>
-            </label>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-            <div className="flex-1">
-              <div className="flex justify-between mb-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Fetch Limit (per source)</label>
-                <span className="text-xs font-semibold" style={{ color: 'var(--indigo)' }}>{maxPapers}</span>
-              </div>
-              <input 
-                type="range" min="5" max="50" step="1" 
-                value={maxPapers} onChange={(e) => setMaxPapers(parseInt(e.target.value))}
-                className="w-full"
-                style={{ accentColor: 'var(--indigo)' }}
-              />
-            </div>
-            <div className="flex-1">
-              <div className="flex justify-between mb-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Review Shortlist</label>
-                <span className="text-xs font-semibold" style={{ color: 'var(--indigo)' }}>{topK}</span>
-              </div>
-              <input 
-                type="range" min="3" max="25" step="1" 
-                value={topK} onChange={(e) => setTopK(parseInt(e.target.value))}
-                className="w-full"
-                style={{ accentColor: 'var(--indigo)' }}
-              />
-            </div>
-          </div>
+        {/* Main Textarea Input */}
+        <div className="flex items-start gap-3">
+          <textarea
+            className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed"
+            style={{
+              color: 'var(--ink)',
+              border: 'none',
+              minHeight: '44px',
+              fontFamily: 'Inter',
+            }}
+            placeholder={queries.some(q => q.trim()) ? 'Add another research query...' : 'Ask a research query... (press Enter to add multiple)'}
+            value={inputValue}
+            rows={Math.min(5, inputValue.split('\n').length || 1)}
+            onChange={(e) => {
+              setInputValue(e.target.value)
+              onType?.(e.target.value.trim().split(/\s+/).filter(Boolean).length + queries.join(' ').trim().split(/\s+/).filter(Boolean).length)
+            }}
+            onKeyDown={handleKeyDown}
+          />
         </div>
 
-        <div className="flex items-center justify-between mt-6">
-          <div className="flex items-center gap-3">
-            {/* Add query button */}
-            {queries.length < 5 && (
-              <motion.button
-                onClick={addQuery}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg"
+        {/* Footer Tools inside Input Bar */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-[rgba(99,102,241,0.08)]">
+          <div className="flex items-center gap-2">
+            {/* Settings Popover toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="p-2 rounded-xl flex items-center justify-center transition-all hover:bg-[rgba(255,255,255,0.06)]"
                 style={{
-                  color: 'var(--indigo)',
-                  border: '1px dashed rgba(99,102,241,0.4)',
-                  background: 'rgba(99,102,241,0.04)',
+                  background: showSettings ? 'rgba(99, 102, 241, 0.12)' : 'none',
+                  border: 'none',
+                  color: showSettings ? 'var(--indigo)' : 'var(--muted)',
+                  cursor: 'pointer'
                 }}
-                whileHover={{ background: 'rgba(99,102,241,0.1)' }}
-                whileTap={{ scale: 0.96 }}
+                title="Adjust limits & AI expansion"
               >
-                + Add query
-              </motion.button>
-            )}
-            <span className="text-xs" style={{ color: 'var(--muted)' }}>
-              {queries.filter((q) => q.trim()).length} of {queries.length} filled
-            </span>
-          </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="21" x2="4" y2="14" />
+                  <line x1="4" y1="10" x2="4" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12" y2="3" />
+                  <line x1="20" y1="21" x2="20" y2="16" />
+                  <line x1="20" y1="12" x2="20" y2="3" />
+                  <line x1="1" y1="14" x2="7" y2="14" />
+                  <line x1="9" y1="8" x2="15" y2="8" />
+                  <line x1="17" y1="16" x2="23" y2="16" />
+                </svg>
+              </button>
 
-          <motion.button
-            onClick={handleSearch}
-            disabled={!queries.some((q) => q.trim()) || loading}
-            className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity disabled:opacity-40 flex items-center justify-center"
-            style={{
-              background: 'var(--indigo)',
-              minWidth: 150,
-            }}
-            variants={buttonVariants}
-            initial="initial"
-            whileHover={loading ? {} : "hover"}
-            whileTap={loading ? {} : { scale: 0.98 }}
-          >
-            {loading ? (
-              <RotatingText messages={searchingMessages} />
-            ) : (
-              <span className="flex items-center gap-1">
-                Run Agent
-                <motion.span
-                  variants={arrowVariants}
-                  transition={{ type: 'spring', stiffness: 300, damping: 12 }}
-                >
-                  →
-                </motion.span>
+              <AnimatePresence>
+                {showSettings && (
+                  <motion.div
+                    className="absolute bottom-10 left-0 z-20 glass p-5 shadow-2xl flex flex-col gap-4 w-[280px]"
+                    style={{
+                      background: 'rgba(15, 12, 35, 0.95)',
+                      borderColor: 'rgba(129, 140, 248, 0.3)',
+                      backdropFilter: 'blur(20px)',
+                      borderRadius: '16px'
+                    }}
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  >
+                    <h4 className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>
+                      Search Settings
+                    </h4>
+                    
+                    <div className="flex flex-col gap-3">
+                      <label className="text-xs font-medium flex items-center gap-2 cursor-pointer" style={{ color: 'var(--ink)' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={useAiExpansion} 
+                          onChange={(e) => setUseAiExpansion(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded-sm"
+                          style={{ accentColor: 'var(--indigo)' }}
+                        />
+                        AI Query Expansion
+                      </label>
+
+                      <div className="pt-2 border-t border-[rgba(255,255,255,0.06)]">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Fetch Limit</span>
+                          <span className="text-[11px] font-bold" style={{ color: 'var(--indigo)' }}>{maxPapers}</span>
+                        </div>
+                        <input 
+                          type="range" min="5" max="50" step="1" 
+                          value={maxPapers} onChange={(e) => setMaxPapers(parseInt(e.target.value))}
+                          className="w-full animate-none"
+                          style={{ accentColor: 'var(--indigo)' }}
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t border-[rgba(255,255,255,0.06)]">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[11px] font-medium" style={{ color: 'var(--muted)' }}>Review Shortlist</span>
+                          <span className="text-[11px] font-bold" style={{ color: 'var(--indigo)' }}>{topK}</span>
+                        </div>
+                        <input 
+                          type="range" min="3" max="25" step="1" 
+                          value={topK} onChange={(e) => setTopK(parseInt(e.target.value))}
+                          className="w-full animate-none"
+                          style={{ accentColor: 'var(--indigo)' }}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {queries.some(q => q.trim()) && (
+              <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                {queries.filter(q => q.trim()).length} queries ready
               </span>
             )}
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            {/* Model Selector Dropdown */}
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="glass px-2.5 py-1 text-[11px] font-semibold outline-none cursor-pointer hover:bg-[rgba(255,255,255,0.03)] transition-colors"
+              style={{
+                borderColor: 'rgba(99,102,241,0.18)',
+                background: 'rgba(20, 18, 42, 0.4)',
+                color: 'var(--ink)',
+                borderRadius: '10px'
+              }}
+            >
+              <option value="qwen-plus" style={{ background: '#0e0b1d' }}>Qwen Plus</option>
+              <option value="qwen-max" style={{ background: '#0e0b1d' }}>Qwen Max</option>
+            </select>
+
+            {/* Submit Button */}
+            <motion.button
+              onClick={handleSearch}
+              disabled={(!queries.some((q) => q.trim()) && !inputValue.trim()) || loading}
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-40"
+              style={{
+                background: (queries.some((q) => q.trim()) || inputValue.trim()) && !loading ? 'var(--indigo)' : 'rgba(255,255,255,0.05)',
+                color: (queries.some((q) => q.trim()) || inputValue.trim()) && !loading ? '#ffffff' : 'var(--muted)',
+                border: 'none',
+                cursor: (queries.some((q) => q.trim()) || inputValue.trim()) && !loading ? 'pointer' : 'default'
+              }}
+            whileHover={(queries.some((q) => q.trim()) || inputValue.trim()) && !loading ? { scale: 1.08, boxShadow: '0 0 10px rgba(99,102,241,0.45)' } : {}}
+            whileTap={(queries.some((q) => q.trim()) || inputValue.trim()) && !loading ? { scale: 0.94 } : {}}
+          >
+            {loading ? (
+              <motion.svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </motion.svg>
+            ) : (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            )}
           </motion.button>
+          </div>
         </div>
       </motion.div>
 

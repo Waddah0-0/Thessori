@@ -28,9 +28,9 @@ export default function App() {
           <SearchHero
             key="hero"
             initialQueries={activeQueries}
-            onSearch={(queries, maxPapers, topK, useAiExpansion) => {
+            onSearch={(queries, maxPapers, topK, useAiExpansion, model) => {
               setEnergy(0)
-              startSearch(queries, maxPapers, topK, useAiExpansion)
+              startSearch(queries, maxPapers, topK, useAiExpansion, model)
             }}
             onType={(wordCount) => setEnergy(wordCount)}
             loading={stage === 'searching'}
