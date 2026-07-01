@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY agent/ ./agent/
 COPY api/ ./api/
 # built React app
-COPY --from=frontend-builder /ui_dist ./ui_dist
+COPY --from=frontend-builder /frontend/dist ./ui_dist
 
 RUN mkdir -p output
 RUN useradd -m appuser && chown -R appuser /app

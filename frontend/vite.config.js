@@ -9,6 +9,6 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../ui_dist', // production build lands here
+    outDir: 'dist', // production build lands here (standard for Vercel)
   },
 })
