@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/Powered%20by-Qwen-blue?style=for-the-badge&logo=alibabacloud" alt="Powered by Qwen Cloud" />
   <h1><img src="assets/thessori_logo.png" alt="Thessori Logo" width="40" valign="middle" style="margin-right: 10px;" /> Thessori</h1>
   <p>An autonomous literature-review agent that actually reads the paper and stops to show its work.</p>
-  <p><strong>🚀 <a href="https://thessori.vercel.app/">Try Thessori Live</a> 🚀</strong></p>
+  <p><strong> <a href="https://thessori.vercel.app/">Try Thessori Live</a> </strong></p>
 </div>
 
 Every research project starts the same way. You have a question, and between you and an answer sit a few hundred papers you haven't read. Finding the relevant ones, reading each, and noticing what nobody has tried yet is mechanical work — right up until the moment it isn't. 
