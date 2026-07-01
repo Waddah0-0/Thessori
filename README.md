@@ -5,7 +5,7 @@
   <p><strong> <a href="https://thessori.vercel.app/">Try Thessori Live</a> </strong></p>
 </div>
 
-Every research project starts the same way. You have a question, and between you and an answer sit a few hundred papers you haven't read. Finding the relevant ones, reading each, and noticing what nobody has tried yet is mechanical work — right up until the moment it isn't. 
+Every research project starts the same way. You have a question, and between you and an answer sit a few hundred papers you haven't read. Finding the relevant ones, reading each, and noticing what nobody has tried yet is mechanical work  right up until the moment it isn't. 
 
 Most tools that promise to help only kick in after you've already gathered the papers. Thessori starts one step earlier. You give it a research question, and it hands back a literature review you could actually put in front of someone. 
 
@@ -25,7 +25,7 @@ graph TD
     Fetch -->|Semantic Scholar API| S2[(Semantic Scholar)]
     
     arXiv & S2 --> Rank[3. Rank Candidates]
-    Rank -->|JSON Title Assessment| QwenRank[Qwen-Plus]
+    Rank -->|JSON Title Assessment| QwenRank[Qwen Model]
     
     Rank --> Checkpoint{{"Human Checkpoint\n(User Checklist)"}}
     
