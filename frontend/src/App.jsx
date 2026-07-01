@@ -7,7 +7,7 @@ import DoneScreen from './components/DoneScreen'
 import { useResearch } from './hooks/useResearch'
 
 export default function App() {
-  const { stage, sessionId, papers, markdown, error, startSearch, approvePapers, deepDive, activeQueries, progressMsg, progressStage, currentIndex, currentAction, resumable, resumeSession, dismissResume, searchInfo } = useResearch()
+  const { stage, sessionId, papers, markdown, error, startSearch, approvePapers, deepDive, activeQueries, progressMsg, progressStage, currentIndex, currentAction, resumable, resumeSession, dismissResume, searchInfo, history, loadSession, deleteSession, goHome } = useResearch()
   const [energy, setEnergy] = useState(0)
 
   return (
@@ -37,6 +37,9 @@ export default function App() {
             resumable={resumable}
             onResume={resumeSession}
             onDismissResume={dismissResume}
+            history={history}
+            onLoadSession={loadSession}
+            onDeleteSession={deleteSession}
           />
         )}
 
@@ -66,6 +69,7 @@ export default function App() {
               // skip AI expansion so they're searched verbatim, not rewritten.
               startSearch(queries, 20, 10, false)
             }}
+            onGoHome={goHome}
           />
         )}
       </AnimatePresence>

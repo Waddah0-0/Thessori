@@ -5,6 +5,8 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 // The agent appends a ```json { agent_action: "search", ... } ``` block to trigger a search.
 const JSON_BLOCK = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
 
@@ -48,7 +50,7 @@ export default function AssistantWidget({ sessionId, onStartSearch, isOpen, setI
 
     try {
       const priorHistory = chatHistory.slice(-8)
-      const res = await fetch('/api/chat', {
+      const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, message: text, history: priorHistory }),

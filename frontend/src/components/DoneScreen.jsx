@@ -5,6 +5,9 @@ import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import AssistantWidget from './AssistantWidget'
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 const EXPORT_OPTIONS = [
   { format: 'markdown', label: 'Markdown', icon: '⌗', hint: '.md file' },
   { format: 'latex', label: 'LaTeX', icon: 'Σ', hint: '.tex · open in Overleaf' },
@@ -12,7 +15,7 @@ const EXPORT_OPTIONS = [
   { format: 'gdoc', label: 'Google Doc', icon: '↗', hint: 'opens in your Drive' },
 ]
 
-export default function DoneScreen({ sessionId, markdown, deepDive, onDeepDive }) {
+export default function DoneScreen({ sessionId, markdown, deepDive, onDeepDive, onGoHome }) {
   const [exporting, setExporting] = useState(null)
   const [exportError, setExportError] = useState(null)
   const [isDiving, setIsDiving] = useState(false)
@@ -31,7 +34,7 @@ export default function DoneScreen({ sessionId, markdown, deepDive, onDeepDive }
     setExporting(format)
     setExportError(null)
     try {
-      const res = await fetch(`/api/export/${sessionId}?format=${format}`)
+      const res = await fetch(`${API_BASE}/api/export/${sessionId}?format=${format}`)
 
       // Graceful handling: PDF can return 501 when no LaTeX engine is present.
       // Show the server's message instead of downloading the error JSON as a file.
@@ -79,6 +82,13 @@ export default function DoneScreen({ sessionId, markdown, deepDive, onDeepDive }
         {/* Sticky Sidebar */}
         <div className="w-full lg:w-72 lg:sticky lg:top-8 flex flex-col gap-5 flex-shrink-0">
           <div>
+            <button
+              onClick={onGoHome}
+              className="text-xs font-semibold flex items-center gap-1.5 transition-colors mb-3 hover:text-[var(--indigo)]"
+              style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              ← Back to Home
+            </button>
             <h2 className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk' }}>
               Thessori Review
             </h2>

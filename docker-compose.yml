@@ -1,6 +1,10 @@
+version: '3.8'
+
 services:
   thessori:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     env_file:
@@ -8,3 +12,8 @@ services:
     volumes:
       - ./output:/app/output   # persist generated reports
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -4,140 +4,210 @@
   <p>An autonomous literature-review agent that actually reads the paper and stops to show its work.</p>
 </div>
 
-<div align="center">
-  <img src="assets/hero.png" alt="Thessori UI" />
-</div>
+Every research project starts the same way. You have a question, and between you and an answer sit a few hundred papers you haven't read. Finding the relevant ones, reading each, and noticing what nobody has tried yet is mechanical work — right up until the moment it isn't. 
 
-Every research project starts the same way: you have a question, and between you and an answer sit a few hundred papers you haven't read. Finding the relevant ones, reading them, and noticing what nobody has tried yet is mechanical work — right up until the moment it isn't.
+Most tools that promise to help only kick in after you've already gathered the papers. Thessori starts one step earlier. You give it a research question, and it hands back a literature review you could actually put in front of someone. 
 
-Most tools wait until you've already gathered the papers. **Thessori starts one step earlier.** 
+Built for the Qwen Cloud Autopilot Agent track, Thessori is designed around a simple thesis: autonomous agents shouldn't make decisions in a black box, and they shouldn't summarize abstracts. 
 
-You give it a research question. It searches arXiv and Semantic Scholar in parallel, has Qwen quietly rank the results, and stops. You get a checklist of the top candidate papers so you can throw out the ones that don't belong. After that, it pulls down the actual PDFs, reads the body text (not just the abstract), writes structured summaries, maps out the gaps across the whole set, and assembles everything into a clean Markdown review. When it's done, you can chat with the report or click "Deep Dive" to send the agent back out after the open threads it just found.
+---
 
-Built for the **Qwen Cloud Autopilot Agent Hackathon**.
+## The Blueprint
 
-## Why this is different
-
-- **It reads the body, not just the abstract:** Abstracts are marketing. They oversell the contribution and bury the limitations. Thessori downloads the arXiv PDF, reads up to the first 25 pages (keeping the introduction, methods, results, and limitations), and summarizes the actual paper.
-- **Human-in-the-loop checkpoint:** Autonomous agents often run off a cliff because the ranking model isn't psychic. Thessori pauses midway. It shows you the candidate papers, lets you untick the bad ones, and only proceeds to the expensive PDF reading step on the papers you actually approved.
-- **Follows the threads:** The final gap analysis generates follow-up queries. One click on "Deep Dive" and the agent starts a fresh run on the gaps it just found—which is how real research actually works.
-
-<div align="center">
-  <img src="assets/checkpoint.png" alt="HITL" />
-</div>
-
-## How it works
-
-The backend is an explicit LangGraph state machine wrapped in FastAPI. I chose a state machine over a free-roaming agent loop so I know exactly what happens on every run. 
-
-There are two compiled LangGraph graphs because the pipeline pauses for a human in the middle. The browser is what carries the state across the gap.
+The backend is built as an explicit state machine using LangGraph, served via FastAPI, and coupled with a React single-page application. The architecture is split into two distinct phases separated by a physical human checkpoint.
 
 ```mermaid
-flowchart TD
-    %% Styling
-    classDef browser fill:#2d3748,stroke:#4a5568,color:#fff
-    classDef api fill:#2b6cb0,stroke:#2c5282,color:#fff
-    classDef phase1 fill:#2f855a,stroke:#276749,color:#fff
-    classDef phase2 fill:#c05621,stroke:#9c4221,color:#fff
-    classDef human fill:#d69e2e,stroke:#b7791f,color:#fff
-
-    subgraph Browser["BROWSER (React SPA)"]
-        Hero[SearchHero] --> PR[PaperReview]
-        PR --> DS[DoneScreen]
-        DS --> AW[AssistantWidget]
-    end
-
-    subgraph Server["FastAPI (api/server.py)"]
-        State[(In-memory sessions)]
-    end
-
-    subgraph Phase1["PHASE 1 (find & rank)"]
-        direction TB
-        E[expand_queries] --> F[fetch_papers]
-        F --> R[rank_papers]
-    end
-
-    subgraph Phase2["PHASE 2 (read & write)"]
-        direction TB
-        S[summarize_papers] --> A[analyze_gaps]
-        A --> G[generate_report]
-    end
-
-    %% Flow
-    Hero -- "POST /api/start" --> State
-    State --> Phase1
-    Phase1 -- "status='awaiting_approval'" --> PR
+graph TD
+    User([User Query]) --> Expand[1. Expand Query]
+    Expand --> Fetch[2. Parallel Fetch]
+    Fetch -->|arXiv API| arXiv[(arXiv)]
+    Fetch -->|Semantic Scholar API| S2[(Semantic Scholar)]
     
-    PR -- "⏸ HUMAN CHECKPOINT" --> PR
+    arXiv & S2 --> Rank[3. Rank Candidates]
+    Rank -->|JSON Title Assessment| QwenRank[Qwen-Plus]
     
-    PR -- "POST /api/approve" --> State
-    State --> Phase2
-    Phase2 -- "markdown report" --> DS
+    Rank --> Checkpoint{{"Human Checkpoint\n(User Checklist)"}}
     
-    DS -- "POST /api/chat" --> AW
-    DS -- "POST /api/deepdive" --> Hero
+    subgraph Phase 1: Selection Graph
+        Expand
+        Fetch
+        Rank
+    end
     
-    class Browser browser
-    class Server api
-    class Phase1 phase1
-    class Phase2 phase2
-    class PR human
+    Checkpoint -->|POST /api/approve| StateBridge[(FastAPI Session State)]
+    
+    StateBridge --> Summarize[4. Summarize PDFs]
+    Summarize -->|Fetch & Segment| PDFs[(arXiv PDF Corpuses)]
+    Summarize --> Gaps[5. Gap Analysis]
+    Gaps -->|Cross-Paper Reasoning| QwenGaps[Qwen-Plus]
+    Gaps --> Report[6. Assemble Report]
+    Report --> Export([Markdown / LaTeX / PDF])
+    
+    subgraph Phase 2: Synthesis Graph
+        Summarize
+        Gaps
+        Report
+    end
+    
+    Export --> Chat[7. Streaming Chat Assistant]
+    Chat -->|Context-Pinned Prompt| QwenChat[Qwen-Plus]
 ```
 
-<div align="center">
-  <img src="assets/report.png" alt="Final Report" />
-</div>
+---
 
-## Running it (Easiest Way: Docker)
+## The Reasoning Layer
 
-Thessori uses Qwen via an OpenAI-compatible endpoint. All you need is Docker and an API key.
+Orchestrating an LLM to perform systematic literature synthesis requires moving past simple prompting. Standard models fail at this task for three specific reasons:
 
-1. Create a `.env` file (or rename `.env.example`) and add your Qwen API key:
+1. **Abstract Bias:** If you feed a model an entire paper, or just its abstract, it tends to parrot the authors' marketing. The abstract is designed to sell the paper; it routinely glosses over methodological compromises and buries the limitations.
+2. **Context Dilution:** Dumping multiple 25-page PDFs into a single prompt causes the model to lose track of fine-grained details in the middle of the texts.
+3. **Structured Failure:** Query expansion and candidate ranking require strict, structured outputs. Under high-temperature settings, standard models frequently output conversational filler or invalid JSON that breaks downstream parsers.
+
+Thessori solves these issues by structuring Qwen's reasoning path into distinct, specialized tasks:
+
+### 1. Structured Query Expansion
+Before searching, the agent refines the user's query into three distinct academic search terms. We use Qwen's native JSON mode to guarantee a clean string array:
+```python
+response = await client.chat.completions.create(
+    model="qwen-plus",
+    messages=[{"role": "system", "content": EXPANSION_PROMPT}, ...],
+    response_format={"type": "json_object"}
+)
+```
+This prevents the agent from silently searching for something other than what the user asked, while ensuring the search queries target different conceptual angles.
+
+### 2. Targeted PDF Segmentation
+Instead of feeding Qwen the raw, unparsed PDF, the agent slices the document. We extract the introduction and methodology (the first 10 pages) and the results, discussion, and limitations (the last 10 pages), bypassing the narrative middle. Qwen is then prompted with a highly constrained system prompt to extract exactly four keys:
+* **Contribution:** The core thesis or artifact introduced.
+* **Method:** The mathematical or experimental setup.
+* **Findings:** The empirical results.
+* **Limitations:** The compromises or failure modes the authors left out of the abstract.
+
+### 3. Cross-Document Synthesis
+During the gap analysis phase, Qwen-plus acts as a critical peer reviewer. Instead of summarizing the papers again, it receives the concatenated summaries of all approved papers and is prompted to find contradictions and omissions (e.g., "Paper A uses method X, but Paper B warns that method X fails under condition Y"). 
+
+Alongside the prose, Qwen generates three follow-up queries representing the unresolved gaps it identified. These are returned as a structured JSON array to feed the **Deep Dive** feature.
+
+---
+
+## The Multi-Agent Orchestration
+
+We chose an explicit state machine over a free-roaming agent loop. The state itself is governed by a single load-bearing contract:
+
+```python
+class ResearchState(TypedDict):
+    queries: list[str]
+    candidates: list[dict]
+    approved_ids: list[str]
+    summaries: dict[str, dict]
+    gap_analysis: str
+    follow_up_queries: list[str]
+    report_markdown: str
+```
+
+Using an explicit `TypedDict` schema ensures that LangGraph treats each key as a persistent channel. In an untyped `dict` schema, partial updates returned by a node cause the remaining keys to fall away; with `ResearchState`, updates merge cleanly across steps.
+
+### The HTTP Session Bridge
+A typical LangGraph application relies on a persistent checkpoint store (like Postgres or Redis) to handle interrupts and human-in-the-loop pauses. To keep the deployment lightweight and avoid database overhead, Thessori splits the pipeline into two separate graphs:
+
+1. **Phase 1 (Find & Rank):** Runs `expand`, `fetch`, and `rank`, then terminates. The FastAPI backend caches the state in an in-memory session store and returns the ranked candidates to the React frontend.
+2. **The Pause:** The React frontend renders the candidates as a checklist and waits for the user to approve or reject papers.
+3. **Phase 2 (Read & Write):** When the user clicks "Generate", the frontend sends a POST request to `/api/approve` containing the approved IDs. The backend retrieves the cached state, updates the `approved_ids`, and invokes the second graph (`summarize`, `gaps`, `report`).
+
+This design keeps the state machine stateless from a deployment perspective, relying on the HTTP boundary to manage the pause.
+
+---
+
+## Behind the Scenes
+
+If you want to know where a project like this actually spends its time, it isn't the headline feature. These are the real engineering hurdles we ran into during development:
+
+### The Dependency Wheel Problem
+Before writing a single line of application code, `pip install` failed on a clean machine running the latest Python interpreter. Pinned versions of core libraries had no prebuilt wheels, causing pip to attempt to compile Pydantic's Rust core from source and eventually crash. We resolved this by shifting from exact version pinning to floor pins (`library>=version`), allowing the resolver to fetch current releases that ship with prebuilt wheels for newer interpreters.
+
+### Semantic Scholar Throttling
+During testing, Semantic Scholar's free API rate-limited the agent, returning `429` status codes. Initially, our fetch step ran under a plain `asyncio.gather`, meaning a single API failure would crash the entire node. We rewrote the fetch node to handle exceptions gracefully:
+```python
+results = await asyncio.gather(
+    fetch_arxiv(queries),
+    fetch_semantic_scholar(queries),
+    return_exceptions=True
+)
+
+candidates = []
+for res in results:
+    if isinstance(res, Exception):
+        logger.error(f"Source fetch failed: {res}")
+        continue
+    candidates.extend(res)
+```
+If Semantic Scholar throttles the request, the agent logs the error and continues running on the arXiv results, ensuring the application remains functional.
+
+### LaTeX Escaping
+The export engine converts the generated Markdown report into a `.tex` file using a series of regex patterns. In early builds, the converter left special characters in the body prose untouched. When a summary contained a percent sign (`%`) or an underscore (`_`), the resulting LaTeX file failed to compile because `%` initiated a comment and `_` is illegal outside math mode. We rewrote the converter to walk the text as tokens, escaping raw LaTeX control characters while leaving markdown bolding, links, and inline math blocks intact.
+
+### WebGL Canvas Cleanup
+The React landing page features an animated WebGL shader background. During development, the entire application would occasionally crash to a black screen. The cause was React's `StrictMode`, which mounts components twice in development. Our cleanup function was destroying the WebGL context on the first unmount, causing the immediate re-mount to try to initialize on a dead canvas and throw an uncaught error. The fix was wrapping the WebGL setup in a try/catch block that degrades gracefully to a CSS gradient if the graphics context fails, preventing a background failure from taking down the entire app.
+
+---
+
+## Repository Structure
+
+```text
+.
+├── agent/
+│   ├── graph.py           # LangGraph state machine compilation
+│   ├── nodes.py           # Qwen execution nodes (expand, rank, summarize, gaps)
+│   ├── report.py          # Markdown/LaTeX compilation & formatting logic
+│   ├── tools.py           # arXiv & Semantic Scholar parallel fetchers
+│   └── progress.py        # Pipeline checkpoint progression tracking
+├── api/
+│   └── server.py          # FastAPI application, session store, & chat streaming
+├── frontend/              # React single-page application
+├── Dockerfile             # Multi-stage build for single-port production
+├── docker-compose.yml     # Local orchestration configuration
+└── nginx.conf             # Static asset and API routing configuration
+```
+
+---
+
+## Setup & Installation
+
+### Option A: Running with Docker (Recommended)
+All you need is Docker and a Qwen API key.
+
+1. Create a `.env` file in the root directory:
 ```env
 QWEN_MODEL=qwen-plus
 QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_API_KEY=your_key_here
+QWEN_API_KEY=your_qwen_api_key_here
 ```
 
-2. Run Docker Compose:
+2. Start the services:
 ```bash
 docker compose up --build -d
 ```
-Thessori will be live at `http://localhost:8000`. Your generated reports and sessions will automatically persist to the `./output` directory.
+The application will be live at `http://localhost:8000`. Generated reports and sessions are saved locally to the `./output` directory.
 
-### Running it manually (Without Docker)
+### Option B: Running Manually
+If you prefer to run the backend and frontend processes directly:
 
-If you prefer to run the raw processes:
-
-1. Install dependencies:
+1. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 npm --prefix frontend install
 ```
 
-2. Run the backend and frontend in development mode:
-```bash
-# Terminal 1: Backend (loads from .env automatically)
-uvicorn api.server:app --reload --port 8000
+2. **Configure environment:**
+Create a `.env` file in the root directory with your `QWEN_API_KEY`.
 
-# Terminal 2: Frontend
-npm --prefix frontend run dev
+3. **Start the backend:**
+```bash
+uvicorn api.server:app --reload --port 8000
 ```
 
-For a full local production build, run `npm --prefix frontend run build` then serve via `uvicorn api.server:app --port 8000`.
-
-## Architecture details that aren't obvious
-- **StateGraph(ResearchState):** LangGraph needs a real `TypedDict`. Using a bare `dict` schema causes unmodified keys to drop off between nodes.
-- **Fail-safe fetch:** The `fetch_papers` node uses `asyncio.gather(..., return_exceptions=True)`. Semantic Scholar heavily rate-limits without an API key, so if it fails, the run safely degrades to just arXiv results instead of killing the entire pipeline.
-- **Streaming Assistant:** The chat at the end is a true `text/plain` stream, making it feel alive and responsive. The backend parses out action tokens after the stream finishes if the model decides it needs to search again.
-
-## License
-
-This project is Open Source under the MIT License.
-
-## Author
-
-**Waddah Ali**
-- [LinkedIn](https://www.linkedin.com/in/waddah-ali-dev/) 
-- [GitHub](https://github.com/Waddah0-0) 
-- [Kaggle](https://www.kaggle.com/waddahali) 
+4. **Start the frontend:**
+```bash
+npm --prefix frontend run dev
+```
+The development server will run at `http://localhost:5173`, proxying API requests to the backend on port 8000.

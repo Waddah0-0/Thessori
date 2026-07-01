@@ -1,8 +1,8 @@
 # Stage 1: Build the React frontend
 FROM node:20-slim AS frontend-builder
 WORKDIR /frontend
-COPY frontend/package.json .
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 COPY frontend/ .
 # vite outDir '../ui_dist' → /ui_dist
 RUN npm run build
@@ -24,7 +24,6 @@ COPY agent/ ./agent/
 COPY api/ ./api/
 # built React app
 COPY --from=frontend-builder /ui_dist ./ui_dist
-COPY nginx.conf /etc/nginx/nginx.conf
 
 RUN mkdir -p output
 RUN useradd -m appuser && chown -R appuser /app

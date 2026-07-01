@@ -32,6 +32,27 @@ function RotatingText({ messages, interval = 1700 }) {
   )
 }
 
+function formatRelativeTime(isoString) {
+  if (!isoString) return 'Unknown date'
+  try {
+    const date = new Date(isoString)
+    const now = new Date()
+    const diffMs = now - date
+    if (diffMs < 0) return 'Just now'
+    const diffMins = Math.floor(diffMs / 60000)
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    const diffHours = Math.floor(diffMins / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  } catch {
+    return 'Unknown date'
+  }
+}
+
 const buttonVariants = {
   initial: {
     scale: 1,
@@ -48,11 +69,12 @@ const arrowVariants = {
   hover: { x: 4 }
 }
 
-export default function SearchHero({ initialQueries = [''], onSearch, onType, loading, resumable, onResume, onDismissResume }) {
+export default function SearchHero({ initialQueries = [''], onSearch, onType, loading, resumable, onResume, onDismissResume, history = [], onLoadSession, onDeleteSession }) {
   const [queries, setQueries] = useState(initialQueries)
   const [maxPapers, setMaxPapers] = useState(20)
   const [topK, setTopK] = useState(10)
   const [useAiExpansion, setUseAiExpansion] = useState(true)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
 
   const searchingMessages = useMemo(
     () =>
@@ -90,47 +112,185 @@ export default function SearchHero({ initialQueries = [''], onSearch, onType, lo
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
     >
-      {/* Resume chip — offered (not forced) when a saved session exists */}
-      <AnimatePresence>
-        {resumable && (
-          <motion.div
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 glass"
-            style={{ padding: '6px 6px 6px 14px', borderRadius: 9999 }}
-            initial={{ opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
+      {/* Floating History Toggle Button */}
+      {history && history.length > 0 && (
+        <button
+          onClick={() => setIsHistoryOpen(true)}
+          className="fixed top-6 right-6 z-30 glass px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all hover:bg-[rgba(99,102,241,0.08)]"
+          style={{
+            borderColor: 'rgba(99,102,241,0.3)',
+            color: 'var(--ink)',
+            background: 'var(--glass)',
+            cursor: 'pointer'
+          }}
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--indigo)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <button
-              onClick={onResume}
-              className="flex items-center gap-2 text-sm font-medium"
-              style={{ color: 'var(--ink)' }}
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <span>History</span>
+          <span
+            className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+            style={{ background: 'rgba(99,102,241,0.18)', color: 'var(--indigo)' }}
+          >
+            {history.length}
+          </span>
+        </button>
+      )}
+
+      {/* Sliding Side Drawer */}
+      <AnimatePresence>
+        {isHistoryOpen && (
+          <>
+            {/* Backdrop overlay */}
+            <motion.div
+              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[4px]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsHistoryOpen(false)}
+            />
+
+            {/* Sidebar drawer panel */}
+            <motion.div
+              className="fixed inset-y-0 right-0 z-50 w-full max-w-[400px] shadow-2xl flex flex-col p-6"
+              style={{
+                background: 'rgba(12, 10, 30, 0.9)',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
+                borderLeft: '1px solid rgba(129, 140, 248, 0.25)',
+                boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.6)'
+              }}
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 220 }}
             >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--indigo)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 3v5h5" />
-                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
-              </svg>
-              Resume your last {resumable.status === 'complete' ? 'report' : 'review'}
-              <span style={{ color: 'var(--indigo)' }}>→</span>
-            </button>
-            <motion.button
-              onClick={onDismissResume}
-              className="flex items-center justify-center w-6 h-6 rounded-full text-xs"
-              style={{ color: 'var(--muted)' }}
-              title="Dismiss"
-              whileHover={{ color: 'var(--ink)', background: 'rgba(255,255,255,0.06)' }}
-            >
-              ✕
-            </motion.button>
-          </motion.div>
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-[rgba(99,102,241,0.15)]">
+                <div>
+                  <h3 className="text-base font-bold" style={{ fontFamily: 'Space Grotesk', color: 'var(--ink)' }}>
+                    Research History
+                  </h3>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted)' }}>
+                    Access your literature reviews & drafts
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsHistoryOpen(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all hover:bg-[rgba(255,255,255,0.06)] hover:text-white"
+                  style={{
+                    color: 'var(--muted)',
+                    background: 'rgba(255,255,255,0.02)',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                  title="Close sidebar"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Drawer List */}
+              <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin">
+                {history.map((item) => {
+                  const isDone = item.status === 'complete' || item.has_report
+                  const firstQuery = item.queries[0] || 'Untitled Research'
+                  const extraQueriesCount = item.queries.length - 1
+
+                  return (
+                    <div
+                      key={item.session_id}
+                      className="p-3.5 rounded-2xl border transition-all hover:bg-[rgba(99,102,241,0.04)] flex flex-col gap-3"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.01)',
+                        borderColor: 'rgba(99, 102, 241, 0.08)',
+                      }}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                          <span
+                            className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
+                            style={{
+                              background: isDone ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
+                              color: isDone ? '#4ade80' : '#fbbf24',
+                              border: isDone ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(245,158,11,0.2)',
+                            }}
+                          >
+                            {isDone ? 'Completed' : 'Draft'}
+                          </span>
+                          {extraQueriesCount > 0 && (
+                            <span
+                              className="text-[9px] px-1.5 py-0.5 rounded font-semibold"
+                              style={{
+                                background: 'rgba(99,102,241,0.08)',
+                                color: 'var(--indigo)',
+                                border: '1px solid rgba(99,102,241,0.15)',
+                              }}
+                            >
+                              +{extraQueriesCount} queries
+                            </span>
+                          )}
+                        </div>
+                        <h4
+                          className="text-xs font-semibold leading-relaxed line-clamp-3 animate-none"
+                          style={{ color: 'var(--ink)' }}
+                          title={item.queries.join(', ')}
+                        >
+                          {firstQuery}
+                        </h4>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-1 pt-2 border-t border-[rgba(99,102,241,0.05)]">
+                        <div className="flex flex-col text-[10px]" style={{ color: 'var(--muted)' }}>
+                          <span>{formatRelativeTime(item.timestamp)}</span>
+                          <span>{item.papers_count} papers fetched</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setIsHistoryOpen(false)
+                              onLoadSession(item.session_id)
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer"
+                            style={{
+                              background: isDone ? 'rgba(99,102,241,0.1)' : 'var(--indigo)',
+                              color: isDone ? 'var(--indigo)' : '#ffffff',
+                              border: isDone ? '1px solid rgba(99,102,241,0.2)' : 'none',
+                            }}
+                          >
+                            {isDone ? 'View Report' : 'Resume'}
+                          </button>
+                          <button
+                            onClick={() => onDeleteSession(item.session_id)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all hover:bg-[rgba(239,68,68,0.15)] hover:text-[#ef4444] cursor-pointer"
+                            style={{
+                              color: 'var(--muted)',
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              border: '1px solid rgba(255, 255, 255, 0.05)',
+                            }}
+                            title="Delete from history"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
@@ -334,6 +494,8 @@ export default function SearchHero({ initialQueries = [''], onSearch, onType, lo
           </motion.button>
         </div>
       </motion.div>
+
+
 
       {/* Connected Workflow Stepper */}
       <motion.div
