@@ -203,25 +203,6 @@ async def get_session(session_id: str):
     )
 
 
-@app.get("/api/history")
-async def get_history():
-    """Return a list of all research sessions, sorted by timestamp (newest first)."""
-    history_list = []
-    for sid, state in sessions.items():
-        history_list.append({
-            "session_id": sid,
-            "queries": state.get("original_queries") or state.get("queries") or [],
-            "status": state.get("status", "unknown"),
-            "timestamp": state.get("timestamp"),
-            "papers_count": len(state.get("raw_papers") or []),
-            "has_report": bool(state.get("markdown_report")),
-        })
-    try:
-        history_list.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
-    except Exception:
-        pass
-    return JSONResponse(history_list)
-
 
 @app.delete("/api/session/{session_id}")
 async def delete_session(session_id: str):

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const SESSION_KEY = 'thessori_session_id'
+const HISTORY_KEY = 'thessori_history'
 
 // A failed fetch (server down / no network) throws a TypeError, not an HTTP
 // error — translate it into something the user can act on.
@@ -25,25 +26,29 @@ export function useResearch() {
   const [currentAction, setCurrentAction] = useState('')
   const [resumable, setResumable] = useState(null) // { sessionId, status, papers, markdown } | null
   const [searchInfo, setSearchInfo] = useState(null) // { queries, original } — what was actually searched
-  const [history, setHistory] = useState([])
-
-  async function loadHistory() {
+  const [history, setHistory] = useState(() => {
     try {
-      const res = await fetch(`${API_BASE}/api/history`)
-      if (res.ok) {
-        const data = await res.json()
-        setHistory(data)
-      }
+      const saved = localStorage.getItem(HISTORY_KEY)
+      return saved ? JSON.parse(saved) : []
     } catch (e) {
-      console.error('Failed to load history', e)
+      console.error('Failed to parse history from localStorage', e)
+      return []
     }
-  }
+  })
+
+  // Automatically save history changes to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+    } catch (e) {
+      console.error('Failed to save history to localStorage', e)
+    }
+  }, [history])
 
   // Survive a refresh WITHOUT hijacking the user: validate the saved session and,
   // if it's still there, offer it as a resumable chip on the landing page rather
   // than jumping straight into it.
   useEffect(() => {
-    loadHistory()
     const savedId = localStorage.getItem(SESSION_KEY)
     if (!savedId) return
     let cancelled = false
@@ -113,6 +118,22 @@ export function useResearch() {
         setPapers(data.papers || [])
         setStage('review')
       }
+
+      // Sync local history metadata with fresh details from server
+      setHistory((prev) =>
+        prev.map((item) => {
+          if (item.session_id === id) {
+            return {
+              ...item,
+              queries: data.original_queries || data.queries || item.queries,
+              status: data.status || item.status,
+              papers_count: data.papers?.length || item.papers_count,
+              has_report: !!data.markdown,
+            }
+          }
+          return item
+        })
+      )
     } catch (e) {
       setError(netError(e))
       setStage('idle')
@@ -120,21 +141,22 @@ export function useResearch() {
   }
 
   async function deleteSession(id) {
+    // Optimistically delete from local history for responsive UI
+    setHistory((prev) => prev.filter((item) => item.session_id !== id))
+    if (sessionId === id) {
+      setSessionId(null)
+      setPapers([])
+      setMarkdown('')
+      setStage('idle')
+      localStorage.removeItem(SESSION_KEY)
+    }
     try {
       const res = await fetch(`${API_BASE}/api/session/${id}`, {
         method: 'DELETE',
       })
-      if (!res.ok) throw new Error('Could not delete session')
-      setHistory((prev) => prev.filter((item) => item.session_id !== id))
-      if (sessionId === id) {
-        setSessionId(null)
-        setPapers([])
-        setMarkdown('')
-        setStage('idle')
-        localStorage.removeItem(SESSION_KEY)
-      }
+      if (!res.ok) throw new Error('Could not delete session from server')
     } catch (e) {
-      setError(netError(e))
+      console.error('Failed to delete session on server:', e)
     }
   }
 
@@ -144,7 +166,6 @@ export function useResearch() {
     setMarkdown('')
     setStage('idle')
     localStorage.removeItem(SESSION_KEY)
-    loadHistory()
   }
 
   async function startSearch(queries, maxPapers = 20, topKPapers = 10, useAiExpansion = true, model = 'qwen-plus') {
@@ -164,7 +185,20 @@ export function useResearch() {
       setPapers(data.papers)
       setSearchInfo({ queries: data.queries || [], original: data.original_queries || [] })
       setStage('review')
-      loadHistory()
+
+      // Save new session details locally in the history
+      const newSession = {
+        session_id: data.session_id,
+        queries: data.original_queries || data.queries || queries,
+        status: data.status || 'review',
+        timestamp: new Date().toISOString(),
+        papers_count: data.papers?.length || 0,
+        has_report: false,
+      }
+      setHistory((prev) => {
+        const filtered = prev.filter((item) => item.session_id !== data.session_id)
+        return [newSession, ...filtered]
+      })
     } catch (e) {
       setError(netError(e))
       setStage('idle')
@@ -205,7 +239,20 @@ export function useResearch() {
       if (data.error) throw new Error(data.error)
       setMarkdown(data.markdown)
       setStage('done')
-      loadHistory()
+
+      // Update session status in local history
+      setHistory((prev) =>
+        prev.map((item) => {
+          if (item.session_id === sessionId) {
+            return {
+              ...item,
+              status: data.status || 'complete',
+              has_report: !!data.markdown,
+            }
+          }
+          return item
+        })
+      )
     } catch (e) {
       clearInterval(intervalId)
       setError(netError(e))
